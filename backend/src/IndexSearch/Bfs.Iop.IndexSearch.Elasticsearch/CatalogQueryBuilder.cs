@@ -106,7 +106,7 @@ internal static class CatalogQueryBuilder
 
         if (!string.IsNullOrWhiteSpace(queryString))
         {
-            must.Add(BuildFreeText(queryString, languages));
+            must.Add(BuildFreeText(queryString, languages, caller));
         }
 
         filters.AddRange(BuildFilterClauses(filter));
@@ -143,6 +143,7 @@ internal static class CatalogQueryBuilder
             or BusinessRole.Submitter => AgencyScoped(caller.Agencies),
         _ => PublicOnly(),
     };
+
 
     private static Dictionary<string, object?> PublicOnly() => new()
     {
@@ -196,13 +197,20 @@ internal static class CatalogQueryBuilder
         };
     }
 
-    private static Dictionary<string, object?> BuildFreeText(string queryString, IReadOnlyList<string> languages)
+    private static Dictionary<string, object?> BuildFreeText(
+        string queryString,
+        IReadOnlyList<string> languages,
+        SearchCaller caller)
     {
         var trimmed = queryString.Trim().Trim('"').Trim();
 
+        // A signed-in caller searches everything; anyone else only the fields the public API returns.
+        bool Searchable(string field) =>
+            caller.HasValidToken || !EsCatalogFields.NonPublicFields.Contains(field);
+
         if (_emailQuery.IsMatch(trimmed))
         {
-            return AnyOf([.. EsCatalogFields.EmailFields.Select(x => ExactTerm(x, trimmed))]);
+            return AnyOf([.. EsCatalogFields.EmailFields.Where(Searchable).Select(x => ExactTerm(x, trimmed))]);
         }
 
         var fields = new List<string>();
@@ -218,6 +226,7 @@ internal static class CatalogQueryBuilder
         }
 
         fields.AddRange(EsCatalogFields.SearchableKeywordFields
+            .Where(Searchable)
             .Select(EsCatalogFields.TextOf));
 
         var should = new List<object>
@@ -246,7 +255,7 @@ internal static class CatalogQueryBuilder
 
         should.Add(ExactTerm(EsCatalogFields.Id, trimmed));
 
-        foreach (var emailField in EsCatalogFields.EmailFields)
+        foreach (var emailField in EsCatalogFields.EmailFields.Where(Searchable))
         {
             should.Add(ExactTerm(emailField, trimmed));
         }

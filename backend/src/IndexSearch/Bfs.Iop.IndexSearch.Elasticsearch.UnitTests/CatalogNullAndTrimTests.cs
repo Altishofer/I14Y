@@ -41,7 +41,7 @@ public class CatalogNullAndTrimTests
         {
             Id = Guid.NewGuid(),
             Type = DataAccess.Abstractions.SearchResourceType.Dataset,
-            ChannelEmails = [null!, "Info@BFS.ch"],
+            ChannelEmails = [null!, "Info@Example.ch"],
         };
 
         var build = () => CatalogDocumentFactory.Build(entry);
@@ -50,6 +50,6 @@ public class CatalogNullAndTrimTests
 
         var doc = CatalogDocumentFactory.Build(entry).Body;
 
-        doc[EsCatalogFields.ChannelEmail].Should().BeEquivalentTo(new[] { "info@bfs.ch" });
+        doc[EsCatalogFields.ChannelEmail].Should().BeEquivalentTo(new[] { "info@example.ch" });
     }
 }
