@@ -9,6 +9,7 @@ All notable changes to this repository are documented in this file.
 - Added an About dialog in both user interfaces.
 - Added configurable response caching for public API retrieval endpoints.
 - Added Agent IRI links in public metadata descriptions.
+- Added configurable webhooks that notify organisations when their datasets, concepts, mapping tables, data services or public services change.
 
 ### Changed
 

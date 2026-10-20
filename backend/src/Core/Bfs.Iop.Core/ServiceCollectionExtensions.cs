@@ -8,6 +8,7 @@ using Bfs.Iop.Core.FilterConfigurations;
 using Bfs.Iop.Core.LinkedData;
 using Bfs.Iop.Core.Messaging.AuditTrail;
 using Bfs.Iop.Core.Messaging.SearchIndex;
+using Bfs.Iop.Core.Messaging.Webhooks;
 using Bfs.Iop.Core.Search;
 using Bfs.Iop.IndexSearch.ApiClient.Extensions;
 using Bfs.Iop.Core.Serialization.Rdf;
@@ -47,6 +48,7 @@ public static class ServiceCollectionExtensions
                 .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)), configuration)
             .AddIopCoreServices()
             .AddAuditTrailServices(configuration)
+            .AddWebhookServices(configuration)
             .AddScoped(_ => new ApiSettings() { EnvironmentName = webHostEnvironmentName });
 
         services
@@ -123,6 +125,20 @@ public static class ServiceCollectionExtensions
         services
             .AddAuditTrailApiClient(configuration)
             .AddSingleton<IMessageQueue<AuditTrailMessage>, ChannelMessageQueue<AuditTrailMessage>>()
-            .AddScoped<IAuditTrailNotifierService, AuditTrailNotifierService>()
+            .AddScoped<AuditTrailNotifierService>()
             .AddHostedService<AuditTrailDispatcherService>();
+
+    private static IServiceCollection AddWebhookServices(this IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddHttpClient(WebhookDispatcherService.HttpClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
+        return services
+            .Configure<WebhookOptions>(configuration.GetSection(WebhookOptions.SectionName))
+            .AddSingleton<IMessageQueue<WebhookMessage>, ChannelMessageQueue<WebhookMessage>>()
+            .AddScoped<IAuditTrailNotifierService>(sp =>
+                ActivatorUtilities.CreateInstance<WebhookNotifierService>(sp, sp.GetRequiredService<AuditTrailNotifierService>()))
+            .AddHostedService<WebhookDispatcherService>();
+    }
 }
