@@ -6,8 +6,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using System.Net;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace Bfs.Iop.Core.UnitTests.Messaging.Webhooks;
 
@@ -15,10 +13,10 @@ namespace Bfs.Iop.Core.UnitTests.Messaging.Webhooks;
 internal sealed class WebhookDispatcherServiceTests
 {
     [Test]
-    public async Task Given_queued_webhook_When_dispatched_Then_request_is_signed()
+    public async Task Given_queued_webhook_When_dispatched_Then_resource_is_posted()
     {
         // Arrange
-        var message = new WebhookMessage(Guid.NewGuid(), "CH_BAFU", AuditTrailResourceType.Dataset, Guid.NewGuid());
+        var message = new WebhookMessage(Guid.NewGuid(), "CH_BFS", AuditTrailResourceType.Dataset, Guid.NewGuid());
         var handler = new CapturingHandler();
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(WebhookDispatcherService.HttpClientName).Returns(_ => new HttpClient(handler));
@@ -29,7 +27,7 @@ internal sealed class WebhookDispatcherServiceTests
         var service = new WebhookDispatcherService(
             queue,
             httpClientFactory,
-            Options.Create(new WebhookOptions { Endpoints = { ["CH_BAFU"] = new(new("https://hooks.example/i14y"), "secret") } }),
+            Options.Create(new WebhookOptions { Endpoints = { ["CH_BFS"] = new("https://hooks.example/i14y") } }),
             Substitute.For<ILogger<WebhookDispatcherService>>());
 
         // Act
@@ -38,12 +36,8 @@ internal sealed class WebhookDispatcherServiceTests
         await service.StopAsync(CancellationToken.None);
 
         // Assert
-        var timestamp = request.Headers.GetValues("webhook-timestamp").Single();
-        var expectedSignature = HMACSHA256.HashData(Encoding.UTF8.GetBytes("secret"), Encoding.UTF8.GetBytes($"{message.Id}.{timestamp}.{body}"));
-
+        request.RequestUri.Should().Be(new Uri("https://hooks.example/i14y"));
         body.Should().Be($$"""{"resourceType":"Dataset","resourceId":"{{message.ResourceId}}"}""");
-        request.Headers.GetValues("webhook-id").Should().Equal(message.Id.ToString());
-        request.Headers.GetValues("webhook-signature").Should().Equal($"v1,{Convert.ToBase64String(expectedSignature)}");
     }
 
     private sealed class CapturingHandler : HttpMessageHandler

@@ -23,7 +23,7 @@ internal sealed class WebhookNotifierServiceTests
         _unrestrictedReaderService = Substitute.For<IUnrestrictedReaderService>();
     }
 
-    [TestCase("CH_BAFU", 1)]
+    [TestCase("CH_MIN", 1)]
     [TestCase("CH_BFS", 0)]
     public async Task Given_dataset_structure_update_When_publisher_has_an_endpoint_Then_webhook_is_enqueued(string publisher, int expectedCount)
     {
@@ -47,7 +47,7 @@ internal sealed class WebhookNotifierServiceTests
     {
         // Arrange
         var id = Guid.NewGuid();
-        _unrestrictedReaderService.TryGetDatasetAsync(id, Arg.Any<CancellationToken>()).Returns(CreateDataset(id, "CH_BAFU"), (DcatDatasetModel?)null);
+        _unrestrictedReaderService.TryGetDatasetAsync(id, Arg.Any<CancellationToken>()).Returns(CreateDataset(id, "CH_MIN"), (DcatDatasetModel?)null);
 
         var service = CreateService();
 
@@ -57,7 +57,7 @@ internal sealed class WebhookNotifierServiceTests
 
         // Assert
         await _queue.Received(1).EnqueueAsync(
-            Arg.Is<WebhookMessage>(x => x.AgentIdentifier == "CH_BAFU" && x.ResourceId == id),
+            Arg.Is<WebhookMessage>(x => x.AgentIdentifier == "CH_MIN" && x.ResourceId == id),
             Arg.Any<CancellationToken>());
     }
 
@@ -82,6 +82,6 @@ internal sealed class WebhookNotifierServiceTests
             Substitute.For<IAuditTrailNotifierService>(),
             _queue,
             _unrestrictedReaderService,
-            Options.Create(new WebhookOptions { Endpoints = { ["CH_BAFU"] = new(new("https://hooks.example/i14y"), "secret") } }),
+            Options.Create(new WebhookOptions { Endpoints = { ["CH_MIN"] = new("https://hooks.example/i14y") } }),
             Substitute.For<ILogger<WebhookNotifierService>>());
 }

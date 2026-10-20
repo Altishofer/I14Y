@@ -2,8 +2,6 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -48,7 +46,7 @@ internal sealed class WebhookDispatcherService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Webhook {MessageId} to {Host} failed. Retry {RetryCount}.", message.Id, endpoint.Url.Host, message.FailCount);
+                _logger.LogWarning(ex, "Webhook {MessageId} to {Host} failed. Retry {RetryCount}.", message.Id, endpoint.Host, message.FailCount);
 
                 if (message.FailCount < MaxRetriesInCaseOfFail)
                 {
@@ -65,23 +63,12 @@ internal sealed class WebhookDispatcherService : BackgroundService
         }
     }
 
-    private static HttpRequestMessage CreateRequest(WebhookMessage message, WebhookEndpoint endpoint)
-    {
-        var body = JsonSerializer.Serialize(new { resourceType = message.ResourceType.ToString(), resourceId = message.ResourceId });
-        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
-        var signature = HMACSHA256.HashData(
-            Encoding.UTF8.GetBytes(endpoint.Secret),
-            Encoding.UTF8.GetBytes($"{message.Id}.{timestamp}.{body}"));
-
-        var request = new HttpRequestMessage(HttpMethod.Post, endpoint.Url)
+    private static HttpRequestMessage CreateRequest(WebhookMessage message, Uri endpoint) =>
+        new(HttpMethod.Post, endpoint)
         {
-            Content = new StringContent(body, Encoding.UTF8, "application/json")
+            Content = new StringContent(
+                JsonSerializer.Serialize(new { resourceType = message.ResourceType.ToString(), resourceId = message.ResourceId }),
+                Encoding.UTF8,
+                "application/json")
         };
-
-        request.Headers.Add("webhook-id", message.Id.ToString());
-        request.Headers.Add("webhook-timestamp", timestamp);
-        request.Headers.Add("webhook-signature", $"v1,{Convert.ToBase64String(signature)}");
-
-        return request;
-    }
 }
